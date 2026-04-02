@@ -88,6 +88,22 @@ async function handlePostback(event, userId) {
       break;
     }
 
+    case 'select_region': {
+      const region = params.get('region');
+      // 地域タグをセッションに仮設定してフロー開始
+      const fallbackTags = [region, '受講未'];
+      startBookingFlow(userId, fallbackTags);
+      const availableDates = await getAvailableDates(60);
+      await lineClient.pushMessage({
+        to: userId,
+        messages: [
+          { type: 'text', text: `📅 ${region}のレッスン日程を選択してください。` },
+          buildDateSelectionMessage(availableDates),
+        ],
+      });
+      break;
+    }
+
     case 'cancel': {
       deleteSession(userId);
       await lineClient.replyMessage({
@@ -134,21 +150,40 @@ async function handleTextMessage(event, userId) {
 // ────────────────────────────────────────────────────────────
 
 /**
- * ① 予約フロー開始 → 日程一覧を表示
+ * ① 予約フロー開始
+ * タグ取得できた場合はそのまま日程選択へ。
+ * 取得できなかった場合はLINE上で地域を選択させる。
  */
 async function handleStartBooking(userId, replyToken) {
-  // タグ取得
   const tags = await getUserTags(userId);
-
-  // 料金プランが存在しない地域（北海道・その他）はフロー対象外
   const plan = getPlanForTags(tags);
+
+  // タグ取得失敗 or 地域タグ未設定 → 地域を選択させる
   if (!plan) {
+    // 北海道・その他は予約不可メッセージ
+    const { detectRegion } = require('./pricing');
+    const region = detectRegion(tags);
+    if (region === '北海道' || region === 'その他') {
+      await lineClient.pushMessage({
+        to: userId,
+        messages: [{ type: 'text', text: '現在、お住まいの地域ではオンライン予約を受け付けておりません。\nレッスン開催時にご案内しますので、お問い合わせください。' }],
+      });
+      return;
+    }
+
+    // 地域タグ未設定の場合 → 地域選択を促す
     await lineClient.pushMessage({
       to: userId,
       messages: [
         {
           type: 'text',
-          text: '現在、お住まいの地域ではオンライン予約を受け付けておりません。\nレッスン開催時にご案内しますので、お問い合わせください。',
+          text: 'レッスンの地域を選択してください。',
+          quickReply: {
+            items: ['東京', '大阪', '宇都宮'].map((r) => ({
+              type: 'action',
+              action: { type: 'postback', label: r, data: `action=select_region&region=${r}`, displayText: r },
+            })),
+          },
         },
       ],
     });
