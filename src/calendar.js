@@ -9,20 +9,35 @@ const { google } = require('googleapis');
 const path = require('path');
 
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
-const KEY_PATH = path.resolve(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH || './google-service-account-key.json');
 
-// 1スロットの長さ（分）。カレンダー上の予定タイトルで管理
 const SLOT_TITLE_PREFIX = '[空き枠]';
 const BOOKED_TITLE_PREFIX = '[予約済]';
 
 /**
  * 認証済み Google Calendar クライアントを返す
+ * 環境変数 GOOGLE_SERVICE_ACCOUNT_KEY_JSON（JSON文字列）を優先して使用し、
+ * なければファイルパスにフォールバックする
  */
 async function getCalendarClient() {
-  const auth = new google.auth.GoogleAuth({
-    keyFile: KEY_PATH,
-    scopes: ['https://www.googleapis.com/auth/calendar'],
-  });
+  let authConfig;
+
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON) {
+    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON);
+    authConfig = {
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/calendar'],
+    };
+  } else {
+    const keyFile = path.resolve(
+      process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH || './google-service-account-key.json'
+    );
+    authConfig = {
+      keyFile,
+      scopes: ['https://www.googleapis.com/auth/calendar'],
+    };
+  }
+
+  const auth = new google.auth.GoogleAuth(authConfig);
   const authClient = await auth.getClient();
   return google.calendar({ version: 'v3', auth: authClient });
 }
