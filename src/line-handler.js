@@ -160,10 +160,11 @@ async function handleStartBooking(userId, replyToken) {
 
   // タグ取得失敗 or 地域タグ未設定 → 地域を選択させる
   if (!plan) {
-    // 北海道・その他は予約不可メッセージ
-    const { detectRegion } = require('./pricing');
-    const region = detectRegion(tags);
-    if (region === '北海道' || region === 'その他') {
+    const REGION_TAGS = ['東京', '大阪', '北海道', '宇都宮', 'その他'];
+    const hasRegionTag = tags.some((t) => REGION_TAGS.includes(t));
+
+    // 明示的に北海道・その他タグが付いている場合のみ予約不可
+    if (hasRegionTag && (tags.includes('北海道') || tags.includes('その他'))) {
       await lineClient.pushMessage({
         to: userId,
         messages: [{ type: 'text', text: '現在、お住まいの地域ではオンライン予約を受け付けておりません。\nレッスン開催時にご案内しますので、お問い合わせください。' }],
@@ -171,7 +172,7 @@ async function handleStartBooking(userId, replyToken) {
       return;
     }
 
-    // 地域タグ未設定の場合 → 地域選択を促す
+    // 地域タグ未設定 or タグ取得失敗 → 地域選択を促す
     await lineClient.pushMessage({
       to: userId,
       messages: [
