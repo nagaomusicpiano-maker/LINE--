@@ -90,17 +90,24 @@ async function handlePostback(event, userId) {
 
     case 'select_region': {
       const region = params.get('region');
-      // 地域タグをセッションに仮設定してフロー開始
       const fallbackTags = [region, '受講未'];
       startBookingFlow(userId, fallbackTags);
-      const availableDates = await getAvailableDates(60);
-      await lineClient.pushMessage({
-        to: userId,
-        messages: [
-          { type: 'text', text: `📅 ${region}のレッスン日程を選択してください。` },
-          buildDateSelectionMessage(availableDates),
-        ],
-      });
+      try {
+        const availableDates = await getAvailableDates(60);
+        await lineClient.pushMessage({
+          to: userId,
+          messages: [
+            { type: 'text', text: `📅 ${region}のレッスン日程を選択してください。` },
+            buildDateSelectionMessage(availableDates),
+          ],
+        });
+      } catch (err) {
+        console.error('select_region エラー:', err);
+        await lineClient.pushMessage({
+          to: userId,
+          messages: [{ type: 'text', text: `エラーが発生しました。\n${err.message}\n\nお問い合わせください。` }],
+        });
+      }
       break;
     }
 
