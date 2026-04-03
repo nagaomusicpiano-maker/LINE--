@@ -21,7 +21,16 @@ const BOOKED_TITLE_PREFIX = '[予約済]';
 async function getCalendarClient() {
   let authConfig;
 
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON) {
+  if (process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+    // 個別環境変数から認証（Railway推奨）
+    authConfig = {
+      credentials: {
+        client_email: process.env.GOOGLE_CLIENT_EMAIL,
+        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      },
+      scopes: ['https://www.googleapis.com/auth/calendar'],
+    };
+  } else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON) {
     const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON);
     authConfig = {
       credentials,
